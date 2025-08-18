@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Créer une partie</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { background:#0a0014; font-family:'Courier New', monospace; color:#e0b3ff; text-align:center; margin:0; }
+    h1 { color:#d67bff; text-shadow:0 0 15px #d67bff; }
+    .box { margin:30px auto; padding:20px; background:rgba(20,0,40,0.7); width:50%; border-radius:8px; box-shadow:0 0 15px #9b4dff; }
+    .input { margin:10px; padding:10px; border:none; border-radius:5px; width:240px; background:#1b0030; color:#fff; text-align:center; }
+    .btn { padding:10px 20px; margin:10px; background:#9b4dff; color:#fff; border:none; border-radius:5px; cursor:pointer; }
+    .btn:hover { background:#d67bff; box-shadow:0 0 10px #d67bff; }
+    .top-right { position:absolute; top:15px; right:15px; }
+  </style>
+</head>
+<body>
+  <button onclick="window.location.href='/index.html'" class="btn top-right">⬅ Accueil</button>
+  <h1>JEU DU BANNI</h1>
+  <div class="box">
+    <h2>Paramètres de la partie</h2>
+    <label>Nombre de joueurs max :</label><br>
+    <input id="maxPlayers" class="input" type="number" value="6" min="2" max="12"><br>
+    <label>Nombre de manches :</label><br>
+    <input id="nbClips" class="input" type="number" value="2" min="1" max="10"><br>
+    <button id="confirmBtn" class="btn">Créer le lobby</button>
+  </div>
+
+<script>
+const socket = io({ transports:["websocket"] });
+const urlParams = new URLSearchParams(window.location.search);
+const pseudo = urlParams.get("pseudo") || "Anonyme";
+
+document.getElementById("confirmBtn").onclick = () => {
+  const maxPlayers = parseInt(document.getElementById("maxPlayers").value, 10);
+  const nbClips = parseInt(document.getElementById("nbClips").value, 10);
+  socket.emit("createGame", { pseudo, maxPlayers, nbClips });
+
+  socket.once("gameCreated", ({ code }) => {
+    window.location.href = `/lobby.html?code=${code}&pseudo=${encodeURIComponent(pseudo)}`;
+  });
+  socket.once("errorMsg", (m) => alert(m));
+};
+</script>
+</body>
+</html>

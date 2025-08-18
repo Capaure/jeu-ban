@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lobby — Jeu du Banni</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root{ --bg:#0a0014; --violet:#9b4dff; --violet-2:#d67bff; --panel:#1b0030; --text:#e0b3ff; }
+    body{margin:0;background:var(--bg);font-family:'Courier New',monospace;color:var(--text)}
+    h1{color:var(--violet-2);text-align:center;margin:18px 0;text-shadow:0 0 15px var(--violet-2)}
+    .wrap{max-width:900px;margin:0 auto;padding:10px}
+    .card{background:rgba(20,0,40,0.7);border:1px solid var(--violet);border-radius:12px;padding:16px;margin:12px}
+    .btn{padding:10px 16px;border:none;border-radius:10px;background:var(--violet);color:#fff;cursor:pointer}
+    .btn:hover{background:var(--violet-2)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .player{background:#120026;border:1px solid #38205e;border-radius:10px;padding:10px}
+    .muted{opacity:.8}
+    #codeBox{font-size:20px;font-weight:800;letter-spacing:.2em}
+  </style>
+</head>
+<body>
+  <h1>Lobby</h1>
+  <div class="wrap">
+    <div class="card">
+      <div>Code: <span id="codeBox"></span> <button id="copyBtn" class="btn">Copier</button> <a class="btn" href="/index.html">Accueil</a></div>
+      <div class="muted">Partage le code avec tes amis.</div>
+    </div>
+
+    <div class="card">
+      <h3>Joueurs</h3>
+      <div id="players" class="grid"></div>
+    </div>
+
+    <div class="card" style="text-align:center">
+      <button id="goBtn" class="btn">Aller au jeu</button>
+      <div id="hint" class="muted"></div>
+    </div>
+  </div>
+
+<script>
+const socket = io({ transports:["websocket"] });
+const q = new URLSearchParams(location.search);
+const code = (q.get("code")||"").toUpperCase();
+const pseudo = q.get("pseudo")||"Anonyme";
+document.getElementById("codeBox").textContent = code;
+
+socket.emit("joinGame", { code, pseudo });
+socket.emit("claimCreator", { code });
+socket.emit("getLobby", code);
+
+let isCreator=false;
+socket.on("youAreCreator", ()=>{ isCreator=true; document.getElementById("hint").textContent="Tu es le créateur."; });
+
+socket.on("lobbyUpdate", ({players, creatorId})=>{
+  const root = document.getElementById("players");
+  root.innerHTML="";
+  players.forEach(p=>{
+    const div = document.createElement("div"); div.className="player";
+    const crown = (p.id===creatorId) ? " 👑" : "";
+    div.textContent = p.name + crown;
+    root.appendChild(div);
+  });
+});
+
+document.getElementById("copyBtn").onclick=()=> navigator.clipboard.writeText(code);
+
+document.getElementById("goBtn").onclick = ()=>{
+  if(!isCreator){ alert("Seul le créateur peut ouvrir le jeu."); return; }
+  socket.emit("openGameFromLobby", code);
+};
+
+// Tout le monde part sur la page de jeu
+socket.on("goToGamePage", ()=>{
+  location.href = `/game.html?code=${code}&pseudo=${encodeURIComponent(pseudo)}`;
+});
+</script>
+</body>
+</html>

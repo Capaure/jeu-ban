@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Podium — Jeu du Banni</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root{ --bg:#0a0014; --violet:#9b4dff; --violet-2:#d67bff; --panel:#1b0030; --text:#e0b3ff; }
+    body{margin:0;background:var(--bg);font-family:'Courier New',monospace;color:var(--text)}
+    h1{color:var(--violet-2);text-align:center;margin:18px 0;text-shadow:0 0 15px var(--violet-2)}
+    .wrap{max-width:900px;margin:0 auto;padding:10px}
+    .row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .card{background:#120026;border:1px solid #38205e;border-radius:12px;padding:14px;width:260px;text-align:center}
+    .place{font-size:22px;font-weight:800}
+    .name{font-size:20px;margin:6px 0}
+    .muted{opacity:.8}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #3d2d63;text-align:left}
+    .right{text-align:right}
+    .btn{padding:10px 16px;border:none;border-radius:10px;background:var(--violet);color:#fff;cursor:pointer}
+  </style>
+</head>
+<body>
+  <h1>Podium</h1>
+  <div class="wrap">
+    <div class="row" id="cards"></div>
+    <div class="card">
+      <h3>Classement complet</h3>
+      <table id="table">
+        <thead><tr><th>#</th><th>Joueur</th><th class="right">Score</th><th class="right">Meilleur Δ</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div style="text-align:center;margin:10px">
+      <a class="btn" href="/index.html">Retour accueil</a>
+    </div>
+  </div>
+
+<script>
+const socket = io({ transports:["websocket"] });
+const q = new URLSearchParams(location.search);
+const code = (q.get("code")||"").toUpperCase();
+const pseudo = q.get("pseudo")||"Anonyme";
+
+socket.emit("joinGame", { code, pseudo });
+socket.emit("getFinal", code);
+
+function fmt(t){ const m=Math.floor(t/60),s=(Math.floor(t%60)+'').padStart(2,'0'),ms=(Math.round((t%1)*1000)+'').padStart(3,'0'); return `${m}:${s}.${ms}`; }
+
+socket.on("finalPodium", ({podium})=>{
+  const row = document.getElementById("cards"); row.innerHTML="";
+  podium.slice(0,3).forEach((p,i)=>{
+    const div = document.createElement("div"); div.className="card";
+    div.innerHTML = `<div class="place">${["🥇","🥈","🥉"][i]} ${i+1}e</div><div class="name">${p.name}</div><div class="muted">Score: ${p.score}</div><div class="muted">Meilleur Δ: ${p.bestDelta==null?"—":fmt(p.bestDelta)}</div>`;
+    row.appendChild(div);
+  });
+  const tb = document.getElementById("tbody"); tb.innerHTML="";
+  podium.forEach((p,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td><td>${p.name}</td><td class="right">${p.score}</td><td class="right">${p.bestDelta==null?"—":fmt(p.bestDelta)}</td>`;
+    tb.appendChild(tr);
+  });
+});
+</script>
+</body>
+</html>

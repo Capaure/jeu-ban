@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Accueil — Jeu du Banni</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root{ --bg:#0a0014; --violet:#9b4dff; --violet-2:#d67bff; --panel:#1b0030; --text:#e0b3ff; }
+    body{margin:0;background:var(--bg);font-family:'Courier New',monospace;color:var(--text);text-align:center}
+    h1{font-size:42px;margin:22px 0;color:var(--violet-2);text-shadow:0 0 15px var(--violet-2)}
+    .wrap{max-width:900px;margin:0 auto;padding:20px}
+    .card{background:rgba(20,0,40,0.7);border:1px solid var(--violet);border-radius:12px;padding:20px;margin:14px}
+    .row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+    .input{padding:10px 12px;border:none;border-radius:8px;background:#1b0030;color:#fff;min-width:220px}
+    .btn{padding:10px 16px;border:none;border-radius:10px;background:var(--violet);color:#fff;cursor:pointer}
+    .btn:hover{background:var(--violet-2)}
+    label{display:block;margin:6px 0 4px;opacity:.9}
+  </style>
+</head>
+<body>
+  <h1>Jeu du Banni</h1>
+  <div class="wrap">
+    <div class="row">
+      <div class="card" style="flex:1 1 360px">
+        <h3>Créer un lobby</h3>
+        <label>Pseudo</label>
+        <input id="pseudoCreate" class="input" placeholder="Ton pseudo">
+        <label>Nombre de manches</label>
+        <input id="roundsInput" class="input" type="number" min="1" value="2" style="width:120px">
+        <div style="margin-top:10px">
+          <button id="createBtn" class="btn">Créer le lobby</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1 1 360px">
+        <h3>Rejoindre un lobby</h3>
+        <label>Code</label>
+        <input id="codeJoin" class="input" maxlength="4" placeholder="CODE">
+        <label>Pseudo</label>
+        <input id="pseudoJoin" class="input" placeholder="Ton pseudo">
+        <div style="margin-top:10px">
+          <button id="joinBtn" class="btn">Rejoindre</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const socket = io({ transports:["websocket"] });
+
+document.getElementById("createBtn").onclick = () => {
+  const pseudo = (document.getElementById("pseudoCreate").value||"").trim();
+  const rounds = parseInt(document.getElementById("roundsInput").value||"2", 10);
+  if(!pseudo) return alert("Entre un pseudo.");
+  socket.emit("createGame", { pseudo, roundsTotal: rounds });
+};
+socket.on("gameCreated", ({code})=>{
+  const pseudo = (document.getElementById("pseudoCreate").value||"").trim();
+  window.location.href = `/lobby.html?code=${code}&pseudo=${encodeURIComponent(pseudo)}`;
+});
+
+document.getElementById("joinBtn").onclick = () => {
+  const code = (document.getElementById("codeJoin").value||"").trim().toUpperCase();
+  const pseudo = (document.getElementById("pseudoJoin").value||"").trim();
+  if(!code || !pseudo) return alert("Entre le code et un pseudo.");
+  socket.emit("joinGame", { code, pseudo });
+};
+socket.on("joined", ({code})=>{
+  const pseudo = (document.getElementById("pseudoJoin").value||"").trim();
+  window.location.href = `/lobby.html?code=${code}&pseudo=${encodeURIComponent(pseudo)}`;
+});
+
+socket.on("errorMsg", (m)=>alert(m));
+</script>
+</body>
+</html>

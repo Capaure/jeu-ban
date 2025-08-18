@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Résultats — Jeu du Banni</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root{ --bg:#0a0014; --violet:#9b4dff; --violet-2:#d67bff; --panel:#1b0030; --text:#e0b3ff; --green:#00d67a; --red:#ff4d4d; --line:#3d2d63; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);font-family:'Courier New',monospace;color:var(--text)}
+    h1{color:var(--violet-2);text-align:center;margin:18px 0;text-shadow:0 0 15px var(--violet-2)}
+    .wrap{max-width:1000px;margin:0 auto;padding:10px}
+    .card{background:rgba(20,0,40,0.7);border:1px solid var(--violet);border-radius:12px;padding:16px;margin:12px}
+    .btn{padding:10px 16px;border:none;border-radius:10px;background:var(--violet);color:#fff;cursor:pointer}
+    .btn:hover{background:var(--violet-2)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}
+    .right{text-align:right}
+    .muted{opacity:.8}
+    #tl{width:100%;height:170px;background:#0f0820;border:1px solid var(--line);border-radius:10px}
+    #footerBtns{display:flex;gap:10px;justify-content:center;align-items:center}
+    #status{ text-align:center; margin:8px 0; min-height:22px; }
+  </style>
+</head>
+<body>
+  <h1>RÉSULTATS — MANCHE</h1>
+  <div class="wrap">
+    <div id="status" class="muted"></div>
+
+    <div class="card">
+      <canvas id="tl"></canvas>
+      <div class="muted" id="rangeTxt" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <table id="table">
+        <thead><tr><th>Joueur</th><th class="right">Temps</th><th class="right">Δ vs limite</th><th class="right">Points</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="4" class="muted">En attente des résultats…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="footerBtns">
+      <button id="nextBtn" class="btn" style="display:none;">Manche suivante</button>
+      <a class="btn" href="/index.html">Accueil</a>
+    </div>
+  </div>
+
+<script>
+const socket = io({ transports:["websocket"] });
+const q = new URLSearchParams(location.search);
+const code = (q.get("code")||"").toUpperCase();
+const pseudo = q.get("pseudo")||"Anonyme";
+
+// éléments
+const tl = document.getElementById("tl");
+const tbody = document.getElementById("tbody");
+const nextBtn = document.getElementById("nextBtn");
+const rangeTxt = document.getElementById("rangeTxt");
+const statusEl = document.getElementById("status");
+
+// état local
+let isCreator=false;
+let lastPayload=null;
+
+// connexion + demandes
+socket.emit("joinGame", { code, pseudo });
+socket.emit("claimCreator", { code });
+// IMPORTANT : on demande explicitement les résultats à l’arrivée
+socket.emit("getResults", code);
+
+// qui est créateur ?
+socket.on("youAreCreator", ()=>{ isCreator=true; if (lastPayload) updateFooter(lastPayload); });
+
+// si le serveur nous renvoie les résultats
+socket.on("roundSummary", (payload)=>{
+  // sécurité de base : payload attendu
+  if (!payload || !Array.isArray(payload.results)) {
+    statusEl.textContent = "Résultats indisponibles pour le moment…";
+    return;
+  }
+  lastPayload = payload;
+  statusEl.textContent = `Manche ${payload.round}/${payload.roundsTotal}`;
+  drawTimeline(payload.limit, payload.results, payload.duration);
+  renderTable(payload.limit, payload.results);
+  updateFooter(payload);
+});
+
+// le créateur peut passer à la manche suivante
+nextBtn.onclick = ()=> socket.emit("nextRound", code);
+
+// synchro navigation
+socket.on("goToGame", ()=> location.href=`/game.html?code=${code}&pseudo=${encodeURIComponent(pseudo)}`);
+socket.on("gameOver", ()=> location.href=`/podium.html?code=${code}&pseudo=${encodeURIComponent(pseudo)}`);
+
+// ==================== UI helpers ====================
+function updateFooter({round, roundsTotal}) {
+  // “Manche suivante” uniquement si créateur ET encore des manches
+  nextBtn.style.display = (isCreator && Number(round) < Number(roundsTotal)) ? "inline-block" : "none";
+}
+
+// couleurs pseudo stables
+function hashColor(name){
+  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0;
+  const r= (h & 0xFF), g=((h>>>8)&0xFF), b=((h>>>16)&0xFF);
+  return `rgb(${80+r%150},${80+g%150},${80+b%150})`;
+}
+function fmt(t){ const m=Math.floor(t/60),s=(Math.floor(t%60)+'').padStart(2,'0'),ms=(Math.round((t%1)*1000)+'').padStart(3,'0'); return `${m}:${s}.${ms}`; }
+function signFmt(delta){ const s = (delta>=0?"+":"−"); return s + fmt(Math.abs(delta)); }
+
+function drawTimeline(limit, results, duration){
+  const ctx = tl.getContext("2d");
+  const DPR = Math.min(window.devicePixelRatio||1, 2);
+  const W = tl.clientWidth, H = tl.clientHeight;
+  tl.width = W*DPR; tl.height = H*DPR; ctx.scale(DPR, DPR);
+
+  const dur = (isFinite(duration) && duration>0) ? duration : Math.max(limit, ...results.map(r=>r.time), 1) + 0.5;
+  const padL=40, padR=20, top=24, bottom=34;
+  const innerW = Math.max(1, W - padL - padR), innerH = Math.max(1, H - top - bottom);
+
+  ctx.fillStyle="#0f0820"; ctx.fillRect(0,0,W,H);
+
+  // ticks secondes
+  ctx.strokeStyle="rgba(255,255,255,.10)"; ctx.lineWidth=1;
+  for(let t=0;t<=dur+1e-9;t+=1){
+    const x = padL + (t/dur)*innerW;
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top+innerH); ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,.5)"; ctx.font="12px monospace"; ctx.textAlign="center";
+    const mm = Math.floor(t/60), ss=(""+Math.floor(t%60)).padStart(2,"0");
+    ctx.fillText(`${mm}:${ss}`, x, H-10);
+  }
+
+  // limite (rouge)
+  const xLimit = padL + (limit/dur)*innerW;
+  ctx.strokeStyle="#ff4d4d"; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(xLimit, top); ctx.lineTo(xLimit, top+innerH); ctx.stroke();
+  ctx.fillStyle="#ff4d4d"; ctx.textAlign="center"; ctx.font="bold 12px monospace";
+  ctx.fillText(fmt(limit), xLimit, top-6);
+
+  // marqueurs joueurs
+  results.forEach(r=>{
+    const x = padL + (r.time/dur)*innerW;
+    const col = hashColor(r.name);
+    ctx.strokeStyle = col; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(x, top+10); ctx.lineTo(x, top+innerH-10); ctx.stroke();
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x, top+5, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle=col; ctx.textAlign="center"; ctx.font="bold 12px monospace";
+    ctx.fillText(r.name, x, top-8);
+  });
+
+  rangeTxt.textContent = `Durée affichée : 0 → ${fmt(dur)}   •   Limite : ${fmt(limit)}`;
+}
+
+function renderTable(limit, results){
+  tbody.innerHTML="";
+  const pts=[5,3,1];
+  results.forEach((r,i)=>{
+    const delta = r.time - limit;
+    const col = delta<=0 ? "var(--green)" : "var(--red)";
+    const tr=document.createElement("tr");
+    tr.innerHTML = `
+      <td><span style="display:inline-block;width:10px;height:10px;background:${hashColor(r.name)};border-radius:50%;margin-right:8px"></span>${r.name}</td>
+      <td class="right">${fmt(r.time)}</td>
+      <td class="right" style="color:${col}">${signFmt(delta)}</td>
+      <td class="right">${pts[i]||0}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  if (!results.length){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td colspan="4" class="muted">Aucune tentative enregistrée.</td>`;
+    tbody.appendChild(tr);
+  }
+}
+</script>
+</body>
+</html>
