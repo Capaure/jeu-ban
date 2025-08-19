@@ -2,123 +2,141 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Partie — Jeu du Banni</title>
+  <title>Partie — Jeu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root{
-      --bg:#0a0014; --violet:#9b4dff; --violet-strong:#d67bff; --panel:#1b0030;
-      --border:#4a2a76; --tick:#3a2a5c; --text:#e0b3ff; --green:#13d67a; --gray:#2a2640; --red:#ff4d4d;
+      --bg:#0a0014; --violet:#9b4dff; --violet-2:#d67bff; --panel:#16002a; --text:#e0b3ff;
+      --border:#4a2a76; --tick:#3a2a5c; --green:#13d67a; --gray:#2a2640; --red:#ff4d4d;
     }
     *{box-sizing:border-box}
-    body { background:var(--bg); font-family:'Courier New', monospace; color:var(--text); margin:0; }
-    h1 { color:var(--violet-strong); text-align:center; margin:18px 0 6px; text-shadow:0 0 15px var(--violet-strong); }
-    #meta { text-align:center; opacity:.9; margin-bottom:8px; }
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+    h1{margin:16px 0 6px;text-align:center;color:var(--violet-2);text-shadow:0 0 12px var(--violet-2)}
+    #meta{text-align:center;opacity:.9;margin-bottom:10px}
 
-    .btn { padding:10px 18px; background:var(--violet); color:#fff; border:none; border-radius:10px; cursor:pointer; margin:4px; }
-    .btn[disabled]{ opacity:.6; cursor:not-allowed; }
-    .btn.danger { background:var(--red); }
-    #backBtn { position:absolute; top:12px; right:12px; background:#ff4d6d; }
+    .btn{padding:10px 16px;border:none;border-radius:10px;background:var(--violet);color:#fff;cursor:pointer}
+    .btn[disabled]{opacity:.6;cursor:not-allowed}
+    .danger{background:var(--red)}
+    #backBtn{position:absolute;top:10px;right:10px;background:#ff4d6d}
 
-    #orderBlock { max-width:1200px; margin:8px auto 0; padding:0 10px; display:none; }
-    #orderTitle { color:#bda9ff; opacity:.9; margin-bottom:6px; letter-spacing:.08em; }
-    #boxesWrap { display:flex; flex-wrap:wrap; gap:8px; }
-    .chip{ display:inline-flex; align-items:center; gap:8px; background:var(--gray); color:#e6dbff; border:1px solid #3b2d5e; border-radius:12px; padding:6px 10px; font-weight:700; }
-    .chip .num{ background:#2a2448; border:1px solid #3f3266; padding:2px 8px; border-radius:999px; font-weight:800; }
-    .chip .time{ opacity:.95; }
-    .chip.active{ background:#3d1670; border-color:#b877ff; color:#fff; box-shadow:0 0 14px rgba(197,139,255,.45); }
-    .chip.done{ background:#0f3b2b; border-color:#19b36b; color:#eafff3; }
-    .chip.done .time{ color:#7CFC8A; }
+    .wrap{max-width:1200px;margin:0 auto;padding:0 10px}
 
-    .videoBox { position:relative; width:min(95vw, 1200px); margin:10px auto; border:2px solid var(--violet-strong); border-radius:12px; overflow:hidden; }
-    video { display:block; width:100%; height:auto; background:#000; }
+    #waitingOverlay{text-align:center;margin:10px 0;color:#e6dbff;opacity:.85;display:none}
 
-    .timelineWrap { max-width:1200px; margin:8px auto; padding:0 8px; }
-    .timeline { position:relative; height:92px; background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:visible; }
-    .ticks { position:absolute; inset:0; pointer-events:none; }
-    .tick { position:absolute; top:0; bottom:0; width:1px; background:var(--tick); }
-    .tickLabel { position:absolute; bottom:6px; transform:translateX(-50%); font-size:12px; }
-    .playhead { position:absolute; bottom:0; width:3px; height:100%; background:var(--violet-strong); box-shadow:0 0 14px var(--violet-strong); }
-    .timeTag { position:absolute; top:-38px; background:#3a2a5c; color:#fff; padding:3px 8px; border-radius:8px; font-weight:bold; white-space:nowrap; display:none; }
+    #orderBlock{display:none;margin:8px 0}
+    #orderTitle{color:#bda9ff;opacity:.9;margin-bottom:6px;letter-spacing:.08em}
+    #boxesWrap{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{display:inline-flex;align-items:center;gap:8px;background:var(--gray);color:#e6dbff;border:1px solid #3b2d5e;border-radius:12px;padding:6px 10px;font-weight:700}
+    .chip .num{background:#2a2448;border:1px solid #3f3266;padding:2px 8px;border-radius:999px;font-weight:800}
+    .chip .time{opacity:.95}
+    .chip.active{background:#3d1670;border-color:#b877ff;color:#fff;box-shadow:0 0 14px rgba(197,139,255,.45)}
+    .chip.done{background:#0f3b2b;border-color:#19b36b;color:#eafff3}
+    .chip.done .time{color:#7CFC8A}
 
-    .barFooter { max-width:1200px; margin:6px auto 0; display:flex; justify-content:space-between; align-items:center; padding:0 10px; gap:8px; flex-wrap:wrap; }
-    .rightBtns { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .videoBox{position:relative;border:2px solid var(--violet-2);border-radius:12px;overflow:hidden}
+    video{display:block;width:100%;height:auto;background:#000}
 
-    #resultsGate { text-align:center; margin:14px 0; display:none; }
+    .timelineWrap{margin:10px 0}
+    .timeline{position:relative;height:92px;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:visible}
+    .ticks{position:absolute;inset:0;pointer-events:none}
+    .tick{position:absolute;top:0;bottom:0;width:1px;background:var(--tick)}
+    .tickLabel{position:absolute;bottom:6px;transform:translateX(-50%);font-size:12px}
+    .playhead{position:absolute;bottom:0;width:3px;height:100%;background:var(--violet-2);box-shadow:0 0 12px var(--violet-2)}
+    .timeTag{position:absolute;top:-38px;background:#3a2a5c;color:#fff;padding:3px 8px;border-radius:8px;font-weight:bold;white-space:nowrap;display:none}
+
+    .barFooter{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+    .rightBtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+    #resultsGate{text-align:center;margin:14px 0;display:none}
   </style>
 </head>
 <body>
   <button id="backBtn" class="btn">Accueil</button>
   <h1>Clip en cours</h1>
-  <div id="meta"></div>
+  <div id="meta" class="wrap"></div>
 
-  <div id="orderBlock">
+  <div id="waitingOverlay" class="wrap">En attente du créateur… (visionnage ou démarrage de la manche)</div>
+
+  <div id="orderBlock" class="wrap">
     <div id="orderTitle">ORDRE DE PASSAGE</div>
     <div id="boxesWrap"></div>
   </div>
 
-  <div class="videoBox">
+  <div class="wrap videoBox" style="margin-top:8px">
     <video id="videoPlayer" playsinline preload="metadata"></video>
   </div>
 
-  <div class="timelineWrap">
+  <div class="wrap timelineWrap">
     <div class="timeline" id="timeline">
       <div class="ticks" id="ticks"></div>
       <div class="playhead" id="playhead"></div>
       <div class="timeTag" id="timeTag">00:00.000</div>
     </div>
-    <div class="barFooter">
+    <div class="barFooter" style="margin-top:6px">
       <span id="leftTime">00:00</span>
       <div class="rightBtns">
         <button id="previewBtn" class="btn" style="display:none;">Lancer le visionnage (2 restants)</button>
         <button id="startRoundBtn" class="btn" style="display:none;">Commencer la manche</button>
         <button id="actionBtn" class="btn" style="display:none;">Démarrer la vidéo</button>
-        <button id="unlockAudioBtn" class="btn" style="display:none;">Activer le son (preview)</button>
-        <span id="hint" style="font-size:12px;opacity:.8;"></span>
+        <button id="unlockAudioBtn" class="btn" style="display:inline-block;">Activer le son (preview)</button>
+        <span id="hint" style="font-size:12px;opacity:.85"></span>
       </div>
       <span id="rightTime">00:00</span>
     </div>
   </div>
 
-  <div id="resultsGate">
+  <div class="wrap timelineWrap">
+    <div style="color:#bda9ff;opacity:.9;margin:4px 0">Tentatives en direct</div>
+    <canvas id="liveTl" style="width:100%;height:120px;background:#0f0820;border:1px solid #3d2d63;border-radius:10px"></canvas>
+  </div>
+
+  <div id="resultsGate" class="wrap">
     <button id="seeResultsBtn" class="btn">VOIR LES RÉSULTATS</button>
   </div>
 
 <script>
 const socket = io({ transports:["websocket"] });
-const q = new URLSearchParams(window.location.search);
+const q = new URLSearchParams(location.search);
 let pseudo = q.get("pseudo") || "";
-try { if (!pseudo) pseudo = localStorage.getItem("pseudo") || ""; } catch {}
-try { if (pseudo) localStorage.setItem("pseudo", pseudo); } catch {}
-if (!pseudo) pseudo = "Anonyme";
+try{ if(!pseudo) pseudo = localStorage.getItem("pseudo") || ""; }catch{}
+try{ if(pseudo) localStorage.setItem("pseudo", pseudo); }catch{}
+if(!pseudo) pseudo = "Anonyme";
 const code = (q.get("code")||"").toUpperCase();
 
 // DOM
-const video=document.getElementById("videoPlayer");
-const previewBtn=document.getElementById("previewBtn");
-const startRoundBtn=document.getElementById("startRoundBtn");
-const actionBtn=document.getElementById("actionBtn");
-const unlockAudioBtn=document.getElementById("unlockAudioBtn");
-const timeline=document.getElementById("timeline");
-const ticks=document.getElementById("ticks");
-const playhead=document.getElementById("playhead");
-const timeTag=document.getElementById("timeTag");
-const orderBlock=document.getElementById("orderBlock");
-const boxesWrap=document.getElementById("boxesWrap");
-const hint=document.getElementById("hint");
-const resultsGate=document.getElementById("resultsGate");
-const seeResultsBtn=document.getElementById("seeResultsBtn");
-const meta=document.getElementById("meta");
-const leftTime=document.getElementById("leftTime");
-const rightTime=document.getElementById("rightTime");
+const video = document.getElementById("videoPlayer");
+const previewBtn = document.getElementById("previewBtn");
+const startRoundBtn = document.getElementById("startRoundBtn");
+const actionBtn = document.getElementById("actionBtn");
+const unlockAudioBtn = document.getElementById("unlockAudioBtn");
+const timeline = document.getElementById("timeline");
+const ticks = document.getElementById("ticks");
+const playhead = document.getElementById("playhead");
+const timeTag = document.getElementById("timeTag");
+const orderBlock = document.getElementById("orderBlock");
+const boxesWrap = document.getElementById("boxesWrap");
+const hint = document.getElementById("hint");
+const resultsGate = document.getElementById("resultsGate");
+const seeResultsBtn = document.getElementById("seeResultsBtn");
+const meta = document.getElementById("meta");
+const leftTime = document.getElementById("leftTime");
+const rightTime = document.getElementById("rightTime");
+const waitingOverlay = document.getElementById("waitingOverlay");
+const liveTl = document.getElementById("liveTl");
 
-let isCreator=false, phase="idle";
-let order=[], currentId=null, passedTimes={};
-let clip="", streamer="", round=1, total=1;
-let previewLeft=2, videoReady=false, audioUnlocked=false;
+// État
+let isCreator = false, phase = "idle";
+let order = [], currentId = null, passedTimes = {};
+let clip = "", streamer = "", round = 1, total = 1;
+let previewLeft = 2, videoReady = false, audioUnlocked = false;
+let limitPublic = 0;
+let liveMarks = []; // {name,time}
 
-// utils
+// Utils
 function fmtMMSS(t){const m=Math.floor(t/60),s=Math.floor(t%60).toString().padStart(2,"0");return `${m}:${s}`;}
 function fmtFull(t){const m=Math.floor(t/60),s=Math.floor(t%60).toString().padStart(2,"0"),ms=Math.floor((t%1)*1000).toString().padStart(3,"0");return `${m}:${s}.${ms}`;}
+function hashColor(name){let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0; const r=(h&0xFF),g=(h>>>8)&0xFF,b=(h>>>16)&0xFF; return `rgb(${80+r%150},${80+g%150},${80+b%150})`; }
 
 function buildTicks(duration){
   ticks.innerHTML=""; if(!isFinite(duration)||duration<=0) return;
@@ -130,21 +148,21 @@ function buildTicks(duration){
     ticks.appendChild(tick); ticks.appendChild(lab);
   }
 }
-function refreshTimeline(){
-  const d = video.duration; if(!isFinite(d)||d<=0) return;
-  buildTicks(d);
-}
+function refreshTimeline(){ const d=video.duration; if(!isFinite(d)||d<=0) return; buildTicks(d); }
+function ensureVideoReady(){ if(videoReady) return Promise.resolve(); return new Promise(res=>video.addEventListener("loadedmetadata", res, {once:true})); }
+function hidePreGameButtons(){ previewBtn.style.display="none"; startRoundBtn.style.display="none"; }
+
 video.addEventListener("loadedmetadata", ()=>{ videoReady=true; refreshTimeline(); });
 window.addEventListener("resize", refreshTimeline);
 
-// chrono live (au millième)
+// Playhead & chrono live
 (function raf(){
   const d = video.duration;
   if (isFinite(d) && d>0){
     const w = timeline.clientWidth;
     const x = Math.min(1, Math.max(0, video.currentTime/d)) * w;
     playhead.style.left = x + "px";
-    timeTag.style.left  = x + "px";
+    timeTag.style.left = x + "px";
     if (!video.paused && !video.ended) {
       timeTag.style.display="block";
       timeTag.textContent = fmtFull(video.currentTime);
@@ -158,11 +176,46 @@ window.addEventListener("resize", refreshTimeline);
   }
   requestAnimationFrame(raf);
 })();
-function ensureVideoReady(){
-  if (videoReady) return Promise.resolve();
-  return new Promise(res=> video.addEventListener("loadedmetadata", res, {once:true}));
+
+// LIVE timeline (résumé simple pendant la manche)
+function drawLiveTimeline(limit, marks){
+  if (!liveTl) return;
+  const ctx = liveTl.getContext("2d");
+  const DPR = Math.min(window.devicePixelRatio||1, 2);
+  const W = liveTl.clientWidth, H = liveTl.clientHeight;
+  liveTl.width = W*DPR; liveTl.height = H*DPR; ctx.scale(DPR, DPR);
+
+  const top=22, bottom=32, padL=40, padR=20;
+  const dur = (isFinite(video.duration)&&video.duration>0) ? video.duration
+            : Math.max(limit, ...marks.map(m=>m.time), 1) + 0.5;
+  const innerW = Math.max(1, W - padL - padR), innerH = Math.max(1, H - top - bottom);
+
+  ctx.fillStyle="#0f0820"; ctx.fillRect(0,0,W,H);
+
+  // ticks secondes
+  ctx.strokeStyle="rgba(255,255,255,.10)"; ctx.lineWidth=1;
+  for(let t=0;t<=dur+1e-9;t+=1){
+    const x=padL + (t/dur)*innerW;
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top+innerH); ctx.stroke();
+    ctx.fillStyle="rgba(255,255,255,.5)"; ctx.font="12px monospace"; ctx.textAlign="center";
+    const mm=Math.floor(t/60), ss=(""+Math.floor(t%60)).padStart(2,"0");
+    ctx.fillText(`${mm}:${ss}`, x, H-8);
+  }
+  // limite rouge
+  const xLimit=padL + (limit/dur)*innerW;
+  ctx.strokeStyle="#ff4d4d"; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(xLimit, top); ctx.lineTo(xLimit, top+innerH); ctx.stroke();
+
+  // marqueurs joueurs
+  marks.forEach(m=>{
+    const x=padL + (m.time/dur)*innerW;
+    const col=hashColor(m.name);
+    ctx.strokeStyle=col; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(x, top+8); ctx.lineTo(x, top+innerH-8); ctx.stroke();
+    ctx.fillStyle=col; ctx.font="bold 12px monospace"; ctx.textAlign="center";
+    ctx.fillText(m.name, x, top-6);
+  });
 }
-function hidePreGameButtons(){ previewBtn.style.display="none"; startRoundBtn.style.display="none"; }
 
 // Connexion
 socket.emit("joinGame", { code, pseudo });
@@ -173,14 +226,15 @@ socket.on("youAreCreator", ()=>{
   isCreator=true; 
   previewBtn.style.display="inline-block"; 
   startRoundBtn.style.display="inline-block"; 
+  waitingOverlay.style.display="none";
 });
 
 // Nouveau round
-socket.on("newRound",({clip:clipSrv,streamer:st,order:ord,round:r,roundsTotal:tot})=>{
+socket.on("newRound",({clip:clipSrv,streamer:st,order:ord,round:r,roundsTotal:tot,limitPublic:lim})=>{
   clip = clipSrv.startsWith("/")?clipSrv:`/${clipSrv}`;
-  streamer = st || ""; round = r||1; total = tot||1;
+  streamer = st || ""; round = r||1; total = tot||1; limitPublic = Number(lim)||0;
 
-  // charger la vidéo
+  // charger vidéo
   videoReady=false;
   video.src=clip; video.load();
   ensureVideoReady().catch(()=>{});
@@ -196,24 +250,27 @@ socket.on("newRound",({clip:clipSrv,streamer:st,order:ord,round:r,roundsTotal:to
   previewBtn.disabled = false;
   startRoundBtn.disabled = false; startRoundBtn.textContent="Commencer la manche";
   actionBtn.style.display="none";
-  unlockAudioBtn.style.display = "inline-block"; // visible pour tout le monde
+  waitingOverlay.style.display = isCreator ? "none" : "block";
+
+  // reset timeline live
+  liveMarks = [];
+  drawLiveTimeline(limitPublic, liveMarks);
 });
 
-// Déverrouiller l'audio (preview)
+// Déverrouiller l'audio (preview) — chacun le fait une fois
 unlockAudioBtn.onclick = async ()=>{
   try{
     await ensureVideoReady();
     video.muted=false; video.volume=1;
-    video.currentTime=0;
-    await video.play().catch(()=>{});
+    video.currentTime=0; await video.play().catch(()=>{});
     video.pause();
     audioUnlocked = true;
     unlockAudioBtn.style.display = "none";
   }catch{}
 };
 
-// Visionnage global
-previewBtn.onclick=async ()=>{
+// Visionnage global (créateur)
+previewBtn.onclick = async ()=>{
   if(!isCreator || previewLeft<=0) return;
   previewBtn.disabled=true; previewBtn.textContent="Visionnage en cours…";
   await ensureVideoReady().catch(()=>{});
@@ -224,12 +281,11 @@ socket.on("previewStart", async ()=>{
   phase="preview";
   try{
     await ensureVideoReady();
-    if (audioUnlocked) { video.muted=false; video.volume=1; }
-    else { video.muted=true; video.volume=0; }
+    if (audioUnlocked) { video.muted=false; video.volume=1; } else { video.muted=true; video.volume=0; }
     video.currentTime=0;
     await video.play().catch(()=>{});
   }catch{}
-  const onEnd = ()=> {
+  const onEnd = ()=>{
     phase="idle";
     video.removeEventListener("ended", onEnd);
     if(previewLeft>0){
@@ -251,13 +307,14 @@ startRoundBtn.onclick=()=>{
   hidePreGameButtons();
 };
 
-// Ordre + tours
+// Tours
 socket.on("startTurn",({playerId,playerName})=>{
   currentId=playerId; renderBoxes();
   if(isCreator){ hidePreGameButtons(); }
   phase = "wait";
   hint.textContent = (socket.id===playerId) ? "Votre tour : 1 tentative." : `${playerName} joue…`;
   orderBlock.style.display="block";
+  waitingOverlay.style.display="none";
 
   if(socket.id===playerId){
     let started=false, locked=false;
@@ -287,29 +344,40 @@ socket.on("startTurn",({playerId,playerName})=>{
   }
 });
 
-socket.on("playerStopped",({playerId,time})=>{ passedTimes[playerId]=Number(time)||0; renderBoxes(); });
+// Marquage live quand un joueur stoppe
+socket.on("playerStopped",({playerId,time})=>{
+  passedTimes[playerId]=Number(time)||0;
+  const p = (order||[]).find(o=>o.id===playerId);
+  if (p) liveMarks.push({ name:p.name, time:Number(time)||0 });
+  drawLiveTimeline(limitPublic, liveMarks);
+  renderBoxes();
+});
 
-// Résultats & navigation
+// Résultats
 socket.on("roundSummary", () => {
   resultsGate.style.display = isCreator ? "block" : "none";
   if (!isCreator) hint.textContent = "En attente du créateur…";
 });
 seeResultsBtn.onclick = () => { if (isCreator) socket.emit("openResults", code); };
 socket.on("goToResults", () => {
-  window.location.href = `/results.html?code=${encodeURIComponent(code)}&pseudo=${encodeURIComponent(pseudo)}`;
-});
-socket.on("goToGame", () => { socket.emit("readyForRound", code); });
-socket.on("gameOver", () => {
-  window.location.href = `/podium.html?code=${encodeURIComponent(code)}&pseudo=${encodeURIComponent(pseudo)}`;
+  location.href = `/results.html?code=${encodeURIComponent(code)}&pseudo=${encodeURIComponent(pseudo)}`;
 });
 
-// back
-document.getElementById("backBtn").onclick = () => window.location.href = "/index.html";
+// Aller vers nouvelle manche
+socket.on("goToGame", ()=> socket.emit("readyForRound", code));
 
-// rendu ordre
+// Fin de partie → podium
+socket.on("gameOver", ()=> {
+  location.href = `/podium.html?code=${encodeURIComponent(code)}&pseudo=${encodeURIComponent(pseudo)}`;
+});
+
+// Retour accueil
+document.getElementById("backBtn").onclick = () => location.href = "/index.html";
+
+// Rendu ordre
 function renderBoxes(){
   boxesWrap.innerHTML="";
-  order.sort((a,b)=>a.order-b.order).forEach(p=>{
+  order.slice().sort((a,b)=>a.order-b.order).forEach(p=>{
     const chip=document.createElement("div"); chip.className="chip";
     if(p.id===currentId) chip.classList.add("active");
     if(passedTimes[p.id]!=null) chip.classList.add("done");
@@ -322,7 +390,7 @@ function renderBoxes(){
   });
 }
 
-// erreurs
+// erreurs claires
 socket.on("errorMsg", m => alert(m));
 video.addEventListener("error", () => {
   const src = video.currentSrc || video.src;
